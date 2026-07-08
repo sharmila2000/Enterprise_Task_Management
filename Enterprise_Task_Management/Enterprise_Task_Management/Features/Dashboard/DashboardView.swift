@@ -6,7 +6,8 @@
 //
 //  PURPOSE:
 //  The Dashboard screen — shown after a successful login.
-//  Displays the task list with stats and filter controls.
+//  Uses AppCard, theme colors (.appPrimary, .appWarning…)
+//  and theme fonts (.appFont) throughout.
 //
 
 import SwiftUI
@@ -24,19 +25,17 @@ struct DashboardView: View {
     // MARK: - Body
     var body: some View {
         ZStack {
+            Color.appBackground.ignoresSafeArea()   // ← theme background
+
             VStack(spacing: 0) {
-
-                // ── Stats Bar ─────────────────────────────────────────
                 statsBar
-                    .padding()
-                    .background(Color(.systemGroupedBackground))
+                    .padding(.horizontal)
+                    .padding(.top, 12)
 
-                // ── Priority Filter ───────────────────────────────────
                 filterBar
                     .padding(.horizontal)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 10)
 
-                // ── Task List ─────────────────────────────────────────
                 if viewModel.filteredTasks.isEmpty && !viewModel.isLoading {
                     emptyState
                 } else {
@@ -44,20 +43,16 @@ struct DashboardView: View {
                 }
             }
 
-            // ── Loading Overlay ───────────────────────────────────────
-            if viewModel.isLoading {
-                loadingOverlay
-            }
+            if viewModel.isLoading { loadingOverlay }
         }
         .navigationTitle("Hello, \(viewModel.currentUserName.components(separatedBy: " ").first ?? "👋")")
         .navigationBarTitleDisplayMode(.large)
-        .navigationBarBackButtonHidden(true)    // can't go back to login once authenticated
+        .navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    viewModel.loadTasks()
-                } label: {
+                Button { viewModel.loadTasks() } label: {
                     Image(systemName: "arrow.clockwise")
+                        .foregroundStyle(Color.appPrimary)   // ← theme color
                 }
             }
         }
@@ -74,31 +69,25 @@ struct DashboardView: View {
 
     // MARK: - Subviews
 
+    // AppCard wraps the stats row — surface background + shadow for free
     private var statsBar: some View {
-        HStack(spacing: 0) {
-            StatCard(value: viewModel.totalCount,     label: "Total",     color: .blue)
-            StatCard(value: viewModel.pendingCount,   label: "Pending",   color: .orange)
-            StatCard(value: viewModel.completedCount, label: "Completed", color: .green)
+        AppCard(padding: 12) {
+            HStack(spacing: 0) {
+                StatCard(value: viewModel.totalCount,     label: "Total",     color: .appPrimary)
+                StatCard(value: viewModel.pendingCount,   label: "Pending",   color: .appWarning)
+                StatCard(value: viewModel.completedCount, label: "Completed", color: .appSuccess)
+            }
         }
     }
 
     private var filterBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                FilterChip(
-                    label: "All",
-                    isSelected: viewModel.selectedPriority == nil,
-                    color: .blue
-                ) {
+                FilterChip(label: "All", isSelected: viewModel.selectedPriority == nil) {
                     viewModel.setFilter(priority: nil)
                 }
-
                 ForEach(TaskPriority.allCases, id: \.self) { priority in
-                    FilterChip(
-                        label: priority.rawValue,
-                        isSelected: viewModel.selectedPriority == priority,
-                        color: .orange
-                    ) {
+                    FilterChip(label: priority.rawValue, isSelected: viewModel.selectedPriority == priority) {
                         viewModel.setFilter(priority: priority)
                     }
                 }
@@ -109,17 +98,14 @@ struct DashboardView: View {
     private var taskList: some View {
         List {
             ForEach(viewModel.filteredTasks) { task in
-                TaskRow(task: task) {
-                    viewModel.toggleCompletion(for: task)
-                }
+                TaskRow(task: task) { viewModel.toggleCompletion(for: task) }
             }
             .onDelete { indexSet in
-                indexSet.forEach { index in
-                    viewModel.delete(task: viewModel.filteredTasks[index])
-                }
+                indexSet.forEach { viewModel.delete(task: viewModel.filteredTasks[$0]) }
             }
         }
         .listStyle(.plain)
+        .scrollContentBackground(.hidden)   // let appBackground show through
     }
 
     private var emptyState: some View {
@@ -141,7 +127,9 @@ struct DashboardView: View {
     }
 }
 
-// MARK: - Reusable Subviews
+// MARK: - Private Subviews
+// These are small, single-purpose views only used by DashboardView,
+// so they live in the same file to keep things easy to find.
 
 private struct StatCard: View {
     let value: Int
@@ -151,37 +139,36 @@ private struct StatCard: View {
     var body: some View {
         VStack(spacing: 2) {
             Text("\(value)")
-                .font(.title2).fontWeight(.bold)
+                .appFont(.sectionTitle)         // ← theme font
                 .foregroundStyle(color)
             Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .appFont(.caption)              // ← theme font
+                .foregroundStyle(Color.appTextSecondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
+        .padding(.vertical, 6)
     }
 }
 
 private struct FilterChip: View {
     let label: String
     let isSelected: Bool
-    let color: Color
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             Text(label)
-                .font(.subheadline)
-                .fontWeight(isSelected ? .semibold : .regular)
+                .appFont(isSelected ? .headline : .subhead)  // ← theme font
                 .padding(.horizontal, 14)
                 .padding(.vertical, 6)
-                .background(isSelected ? color.opacity(0.15) : Color(.systemGray5))
-                .foregroundStyle(isSelected ? color : .secondary)
+                .background(isSelected ? Color.appPrimaryMuted : Color.appSurface)
+                .foregroundStyle(isSelected ? Color.appPrimary : Color.appTextSecondary)
                 .clipShape(Capsule())
                 .overlay(
-                    Capsule().stroke(isSelected ? color : Color.clear, lineWidth: 1)
+                    Capsule().stroke(isSelected ? Color.appPrimary : Color.clear, lineWidth: 1)
                 )
         }
+        .buttonStyle(.plain)
     }
 }
 
@@ -194,26 +181,25 @@ private struct TaskRow: View {
             Button(action: onToggle) {
                 Image(systemName: task.isCompleted ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundStyle(task.isCompleted ? .green : .secondary)
+                    .foregroundStyle(task.isCompleted ? Color.appSuccess : Color.appTextTertiary)
             }
             .buttonStyle(.plain)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(task.title)
-                    .fontWeight(.medium)
-                    .strikethrough(task.isCompleted, color: .secondary)
-                    .foregroundStyle(task.isCompleted ? .secondary : .primary)
+                    .appFont(.headline)         // ← theme font
+                    .strikethrough(task.isCompleted, color: .appTextTertiary)
+                    .foregroundStyle(task.isCompleted ? Color.appTextSecondary : Color.appTextPrimary)
 
                 if !task.description.isEmpty {
                     Text(task.description)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .appFont(.caption)      // ← theme font
+                        .foregroundStyle(Color.appTextSecondary)
                         .lineLimit(1)
                 }
             }
 
             Spacer()
-
             PriorityBadge(priority: task.priority)
         }
         .padding(.vertical, 4)
@@ -223,18 +209,18 @@ private struct TaskRow: View {
 private struct PriorityBadge: View {
     let priority: TaskPriority
 
+    // Each priority maps to a theme status color
     var color: Color {
         switch priority {
-        case .high:   return .red
-        case .medium: return .orange
-        case .low:    return .green
+        case .high:   return .appError
+        case .medium: return .appWarning
+        case .low:    return .appSuccess
         }
     }
 
     var body: some View {
         Text(priority.rawValue)
-            .font(.caption2)
-            .fontWeight(.semibold)
+            .appFont(.badge)                    // ← theme font
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .background(color.opacity(0.12))
@@ -245,8 +231,11 @@ private struct PriorityBadge: View {
 
 // MARK: - Preview
 
-#Preview {
-    NavigationStack {
-        DashboardView()
-    }
+#Preview("Light") {
+    NavigationStack { DashboardView() }
+}
+
+#Preview("Dark") {
+    NavigationStack { DashboardView() }
+        .preferredColorScheme(.dark)            // ← test dark mode
 }

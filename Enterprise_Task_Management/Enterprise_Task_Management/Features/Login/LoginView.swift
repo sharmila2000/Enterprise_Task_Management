@@ -11,6 +11,8 @@
 //  - Uses two-way binding ($) to connect text fields to ViewModel properties
 //  - Reacts to ViewModel state changes (isLoading, errorMessage, isLoggedIn)
 //  - NEVER performs business logic — only delegates to ViewModel
+//  - Uses AppTextField, AppButton, AppCard from Components/
+//    and theme colors/fonts from Theme/
 //
 
 import SwiftUI
@@ -20,7 +22,6 @@ import SwiftUI
 struct LoginView: View {
 
     // MARK: - ViewModel
-    // Resolved from DIContainer so dependencies are properly injected
     @StateObject private var viewModel = LoginViewModel(
         authRepository: DIContainer.shared.resolve(AuthenticationRepositoryProtocol.self)
     )
@@ -29,30 +30,26 @@ struct LoginView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 28) {
-
-                    // ── Header ────────────────────────────────────────
+                VStack(spacing: 32) {
                     headerSection
-
-                    // ── Form ──────────────────────────────────────────
                     formSection
-
-                    // ── Login Button ──────────────────────────────────
-                    loginButton
-
-                    Spacer(minLength: 20)
+                    // AppButton replaces the manual ZStack + RoundedRectangle
+                    AppButton(
+                        title: "Sign In",
+                        isLoading: viewModel.isLoading,
+                        isDisabled: !viewModel.isLoginEnabled
+                    ) {
+                        viewModel.login()
+                    }
                 }
                 .padding(24)
             }
+            .background(Color.appBackground)
             .navigationTitle("Sign In")
             .navigationBarTitleDisplayMode(.large)
-
-            // ── Navigate to Dashboard on successful login ─────────────
             .navigationDestination(isPresented: $viewModel.isLoggedIn) {
                 DashboardView()
             }
-
-            // ── Error Alert ───────────────────────────────────────────
             .alert("Login Failed", isPresented: Binding(
                 get: { viewModel.hasError },
                 set: { if !$0 { viewModel.clearError() } }
@@ -70,69 +67,44 @@ struct LoginView: View {
         VStack(spacing: 12) {
             Image(systemName: "person.badge.key.fill")
                 .font(.system(size: 56))
-                .foregroundStyle(.blue)
+                .foregroundStyle(Color.appPrimary)           // ← theme color
 
             Text("Enterprise Task Management")
-                .font(.headline)
-                .foregroundStyle(.secondary)
+                .appFont(.subhead)                      // ← theme font
+                .foregroundStyle(Color.appTextSecondary)     // ← theme color
         }
         .padding(.top, 20)
     }
 
     private var formSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-
-            // Email Field
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Email").font(.subheadline).foregroundStyle(.secondary)
-                TextField("you@company.com", text: $viewModel.email)
-                    .textFieldStyle(.roundedBorder)
-                    .keyboardType(.emailAddress)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-
-                if let emailError = viewModel.emailError {
-                    Text(emailError).font(.caption).foregroundStyle(.red)
-                }
-            }
-
-            // Password Field
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Password").font(.subheadline).foregroundStyle(.secondary)
-                SecureField("Min. 6 characters", text: $viewModel.password)
-                    .textFieldStyle(.roundedBorder)
-
-                if let passwordError = viewModel.passwordError {
-                    Text(passwordError).font(.caption).foregroundStyle(.red)
-                }
-            }
+        // AppTextField replaces the manual VStack + label + field + error per field
+        VStack(spacing: 16) {
+            AppTextField(
+                label: "Email",
+                placeholder: "you@company.com",
+                text: $viewModel.email,
+                errorMessage: viewModel.emailError,
+                keyboardType: .emailAddress,
+                autocapitalization: .never
+            )
+            AppTextField(
+                label: "Password",
+                placeholder: "Min. 6 characters",
+                text: $viewModel.password,
+                errorMessage: viewModel.passwordError,
+                isSecure: true
+            )
         }
-    }
-
-    private var loginButton: some View {
-        Button {
-            viewModel.login()   // ← delegate action to ViewModel, never inline logic
-        } label: {
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(viewModel.isLoginEnabled ? Color.blue : Color.gray.opacity(0.4))
-
-                if viewModel.isLoading {
-                    ProgressView().tint(.white)
-                } else {
-                    Text("Sign In")
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.white)
-                }
-            }
-            .frame(height: 50)
-        }
-        .disabled(!viewModel.isLoginEnabled || viewModel.isLoading)
     }
 }
 
 // MARK: - Preview
 
-#Preview {
+#Preview("Light") {
     LoginView()
+}
+
+#Preview("Dark") {
+    LoginView()
+        .preferredColorScheme(.dark)    // ← test dark mode directly in canvas
 }
